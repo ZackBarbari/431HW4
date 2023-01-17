@@ -1,3 +1,6 @@
+#Zack Barbari, zackaxal
+#I certify that no unauthorized assistance has been received or given in the completion of this work.
+
 import sys
 input = ""
 global current
@@ -151,8 +154,9 @@ def mailfromcmd():
 				current +=5
 				if nullspace():
 					if path():
-						if CRLF():
-							return True
+						if nullspace():
+							if CRLF():
+								return True
 	if error_place == "":
 		error_place = "mail-from-cmd"
 	return False
@@ -163,5 +167,5 @@ for line in sys.stdin:
 	if mailfromcmd():
 		print('Sender ok')
 	else:
-		print('ERROR -- {error_place}')
+		print(f'ERROR -- {error_place}')
 	error_place = ""
