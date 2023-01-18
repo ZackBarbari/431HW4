@@ -10,7 +10,7 @@ error_place = ""
 
 def special():
 	global current
-	if input[current] in ['<', '>', '(', ')', '[', ']', ',', ';', ':', '@', '"', '/']:
+	if input[current] in ['<', '>', '(', ')', '[', ']', ',', ';', ':', '@', '"', '\\', '.']:
 		return True
 	return False
 
@@ -34,7 +34,10 @@ def CRLF():
 
 
 def char():
-	return not(special() or SP())
+	global current
+	if not(special() or SP()):
+		return (ord(input[current]) < 128)
+	return False
 
 
 def digit():
@@ -51,7 +54,7 @@ def letter():
 
 def letdig():
 	global current
-	return letter() or digit()
+	return (letter() or digit())
 
 
 def letdigstr():
@@ -64,8 +67,10 @@ def letdigstr():
 
 
 def element():
+	global current
 	global error_place
 	if letter():
+		current += 1
 		letdigstr()
 		return True
 	if error_place == "":
@@ -78,8 +83,10 @@ def domain():
 	if element():
 		if input[current] == ".":
 			current += 1
-			domain()
-		return True
+			if domain():
+				return True
+		else:
+			return True
 	return False
 
 
@@ -139,6 +146,7 @@ def whitespace():
 
 
 def nullspace():
+	global error_place
 	whitespace()
 	error_place = ""
 	return True
