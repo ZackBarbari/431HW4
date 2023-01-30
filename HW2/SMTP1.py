@@ -289,3 +289,6 @@ for line in sys.stdin:
 				resetemail()
 			else:
 				email += input
+
+if state == 3:
+	print('501 Syntax error in parameters or arguments')
