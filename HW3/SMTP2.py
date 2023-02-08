@@ -60,9 +60,7 @@ def getresponse(code):
 	global file
 	response = sys.stdin.readline()
 	sys.stderr.write(response)
-	if response == '':
-		file = False
-	elif not responsecode(code):
+	if not responsecode(code):
 		breakread()
 
 def bodyread():
@@ -91,7 +89,8 @@ while(file):
 		if file:
 			print('.')
 			getresponse('250')
-			breakread()
+			if file:
+				breakread()
 		break
 	match state:
 		#Reading From:
