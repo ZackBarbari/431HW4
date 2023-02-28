@@ -228,48 +228,47 @@ input = True
 sending = False
 try:
 	while(input):
-		match inputstate:
-			case 0:
-				print('From:')
-				input = sys.stdin.readline()
-				if validfrom():
-					inputstate = 1
-					fromline = input
-					#fromline = 'bana@ag.a.\n'
-					msg += (f'From: <{fromline[:-1]}>\n')
+		if inputstate == 0:
+			print('From:')
+			input = sys.stdin.readline()
+			if validfrom():
+				inputstate = 1
+				fromline = input
+				#fromline = 'bana@ag.a.\n'
+				msg += (f'From: <{fromline[:-1]}>\n')
+			else:
+				print('Bad from grammar.')
+		elif inputstate == 1:
+			print('To:')
+			input = sys.stdin.readline()
+			if validto():
+				#print(rcpts, len(rcpts))
+				inputstate = 2
+				#toline = input
+				#toline = 'bana@ag.a.\n'
+				msg += 'To: '
+				for i in range(len(rcpts)):
+					msg += (f'<{rcpts[i]}>')
+					if i < len(rcpts)-1:
+						msg += ', '
+				msg += '\n'
+			else:
+				print('Bad to grammar.')
+		elif inputstate == 2:
+			print('Subject:')
+			subjectline = sys.stdin.readline()
+			inputstate = 3
+			msg += (f'Subject: {subjectline}\n')
+		elif inputstate == 3:
+			print('Message:')
+			messageread = True
+			while(messageread):
+				msgline = sys.stdin.readline()
+				if len(msgline) == 2 and msgline[0] == '.' and ord(msgline[1]) == 10:
+					messageread = False
+					input = False
 				else:
-					print('Bad from grammar.')
-			case 1:
-				print('To:')
-				input = sys.stdin.readline()
-				if validto():
-					#print(rcpts, len(rcpts))
-					inputstate = 2
-					#toline = input
-					#toline = 'bana@ag.a.\n'
-					msg += 'To: '
-					for i in range(len(rcpts)):
-						msg += (f'<{rcpts[i]}>')
-						if i < len(rcpts)-1:
-							msg += ', '
-					msg += '\n'
-				else:
-					print('Bad to grammar.')
-			case 2:
-				print('Subject:')
-				subjectline = sys.stdin.readline()
-				inputstate = 3
-				msg += (f'Subject: {subjectline}\n')
-			case 3:
-				print('Message:')
-				messageread = True
-				while(messageread):
-					msgline = sys.stdin.readline()
-					if len(msgline) == 2 and msgline[0] == '.' and ord(msgline[1]) == 10:
-						messageread = False
-						input = False
-					else:
-						msg += f'{msgline}'
+					msg += f'{msgline}'
 except BaseException as error:
 	print(error)
 	sys.exit()
@@ -299,49 +298,48 @@ if(soc):
 try:
 	while(sending):
 		#print(state)
-		match state:
-			#Sending HELO
-			case -1:
-				#print(f'HELO {socket.gethostname()}')
-				soc.sendall(f'HELO {socket.gethostname()}\n'.encode())
+		#Sending HELO
+		if state == -1:
+			#print(f'HELO {socket.gethostname()}')
+			soc.sendall(f'HELO {socket.gethostname()}\n'.encode())
+			getresponse('250')
+			state = 0
+		#Reading From:
+		elif state == 0:
+			#print(f'MAIL FROM: <{fromline[:-1]}>')
+			output = f'MAIL FROM: <{fromline[:-1]}>\n'
+			for i in range(len(rcpts)):
+				output += f'RCPT TO: <{rcpts[i]}>\n'
+			output += f'DATA\n{msg}.\n'
+			soc.sendall(output.encode())
+			#soc.sendall(f'MAIL FROM: <{fromline[:-1]}>\n'.encode())
+			getresponse('250')
+			state = 1
+		#Reading To:
+		elif state == 1:
+			for i in range(len(rcpts)):
+				#print('iii')
+				#print(f'RCPT TO: <{rcpts[i]}>')
+				#soc.sendall(f'RCPT TO: <{rcpts[i]}>\n'.encode())
 				getresponse('250')
-				state = 0
-			#Reading From:
-			case 0:
-				#print(f'MAIL FROM: <{fromline[:-1]}>')
-				output = f'MAIL FROM: <{fromline[:-1]}>\n'
-				for i in range(len(rcpts)):
-					output += f'RCPT TO: <{rcpts[i]}>\n'
-				output += f'DATA\n{msg}.\n'
-				soc.sendall(output.encode())
-				#soc.sendall(f'MAIL FROM: <{fromline[:-1]}>\n'.encode())
-				getresponse('250')
-				state = 1
-			#Reading To:
-			case 1:
-				for i in range(len(rcpts)):
-					#print('iii')
-					#print(f'RCPT TO: <{rcpts[i]}>')
-					#soc.sendall(f'RCPT TO: <{rcpts[i]}>\n'.encode())
-					getresponse('250')
-				state = 2
-			#Reading Subject:
-			case 2:
-				#print('DATA')
-				#soc.sendall('DATA\n'.encode())
-				#print(soc.recv(2048).decode())
-				getresponse('354')
-				state = 3
-			case 3:
-				#print(msg)
-				#soc.sendall((f'{msg}').encode())
-				#print('.')
-				#soc.sendall('.\n'.encode())
-				getresponse('250')
-				#print('QUIT')
-				soc.sendall('QUIT\n'.encode())
-				getresponse('221')
-				sending = False
+			state = 2
+		#Reading Subject:
+		elif state == 2:
+			#print('DATA')
+			#soc.sendall('DATA\n'.encode())
+			#print(soc.recv(2048).decode())
+			getresponse('354')
+			state = 3
+		elif state == 3:
+			#print(msg)
+			#soc.sendall((f'{msg}').encode())
+			#print('.')
+			#soc.sendall('.\n'.encode())
+			getresponse('250')
+			#print('QUIT')
+			soc.sendall('QUIT\n'.encode())
+			getresponse('221')
+			sending = False
 except BaseException as error:
 	print(error)
 	soc.close()
