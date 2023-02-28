@@ -377,7 +377,7 @@ while (recieve):
 				#resetemail()
 				state = -3
 		#Only accepting RCPT TO:
-		if state == 1:
+		elif state == 1:
 			input = msginput[0]
 			#print(input)
 			if rcpttocmd():
