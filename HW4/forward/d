@@ -1,0 +1,27 @@
+From: <a@a>
+To: <b@b>, <c@c>, <d@d>, <e@d>
+Subject: subj
+
+msg
+msg
+msg3
+From: <b@b>
+To: <a@a>, <c@c>, <d@d>, <e@d>
+Subject: subj2
+
+msg1
+msg2
+msg3
+
+empty
+ 
+space
+. 
+dot space
+From: <a@a>
+To: <b@b>, <c@c>, <d@d>, <d@e>
+Subject: this is goofy problem
+
+goofy problem
+not working
+:(
