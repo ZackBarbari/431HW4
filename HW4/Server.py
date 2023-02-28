@@ -15,6 +15,7 @@ pathend = -1
 hoststart = -1
 #hostindex = -1
 partner = ""
+import os
 
 def special():
 	global current
@@ -248,8 +249,8 @@ try:
 	PORT = int(sys.argv[1])
 	HOST = socket.gethostname()
 	soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	soc.bind((HOST, PORT))
 	soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+	soc.bind((HOST, PORT))
 	conn = ''
 	addr = ''
 
@@ -263,7 +264,18 @@ try:
 		#print("LISTEN")
 		soc.listen()
 		#print(conn)
-		conn, addr = soc.accept()
+		try:
+			conn, addr = soc.accept()
+			#print("LISTEN2")
+		except BaseException as e:
+			print(e)
+			#print(soc)
+			#print(conn)
+			soc.close()
+			#print(soc)
+			#print("r")
+			sys.exit()
+			#print("b")
 		#print(conn)
 		#print(f'connection from {addr}')
 		#print(f'220 {HOST}')
@@ -274,9 +286,10 @@ try:
 	if conn == '':
 		newlisten()
 	#recieve = True
-except BaseException as e:
-	print(e)
+except Exception as er:
+	print(er)
 	soc.close()
+	#print("a")
 	sys.exit()
 
 def resetemail():
@@ -290,9 +303,10 @@ def resetemail():
 	global open
 	global recieve
 	global hosts
+	global input
 	global partner
 	global soc
-	#conn.close()
+	conn.close()
 	partner = ""
 	state = -2
 	current = 0
@@ -300,31 +314,31 @@ def resetemail():
 	recipients = []
 	hosts = []
 	email = ""
+	msginput = ''
+	input = ''
 	recieve = False
-	#try:
 	newlisten()
-	#except BaseException as e:
-		#print(e)
-		#print(soc.getsockname())
-		#print(conn)
-		#soc.shutdown(socket.SHUT_RDWR)
-		#soc.close()
-		#exit()
-		#print("MAYDAY MAYDAY")
+	#print("know")
+
+msginput = ''
 
 while (recieve):
 	try:
 		#print(state)
-		input = conn.recv(1024).decode()
+		#print(f'START: {input}')
+		#input = conn.recv(2048).decode()
 		#print(f'HERE IN SOCKET {input}', end="")
 		if len(input) == 5 and input[0] == "Q" and input[1] == "U" and input[2] == "I" and input[3] == "T":
+			#print(f'INPUT: {input}')
 			#print(f'221 {HOST} closing connection')
 			conn.sendall(f'221 {HOST} closing connection\n'.encode())
 			resetemail()
+			#print('se')
 			state = -2
 		match state:
 			#Accepting HELO message
 			case -1:
+				input = conn.recv(2048).decode()
 				if helomsg():
 					#print(f'250 Hello {partner} pleased to meet you')
 					conn.sendall(f'250 Hello {partner} pleased to meet you\n'.encode())
@@ -335,10 +349,23 @@ while (recieve):
 					resetemail()
 			#Only accepting MAIL FROM:
 			case 0:
+				msginput = conn.recv(2048).decode()
+				#msginput = 'MAIL FROM:<jack@cs.unc.edu>\nRCPT TO:<.jeffay@cs.unc.edu >\n'
+				#msginput = 'MAIL FROM:<jeffay@cs.un*c.edu>\n'
+				#msginput = ' MAIL FROM:<jeffay@cs.unc.edu>\n'
+				#msginput = 'MAIL FROM:<jack@cs.unc.edu>\nRCPT TO:<jake@cs.unc.edu>\n MAIL FROM:<jeffay@unc.edu>\n'
+				msginput = msginput.split('\n')
+				for i in range(len(msginput)):
+					msginput[i] += '\n'
+				msginput.pop(len(msginput)-1)
+				input = msginput[0]
+				#print(msginput)
+				#print(input)
 				if mailfromcmd():
 					#print('250 OK')
-					conn.sendall('250 OK\n'.encode())
+					conn.send('250 OK\n'.encode())
 					state = 1
+					msginput.pop(0)
 				else:
 					if commandcheck(1) or commandcheck(2):
 						#print('503 Bad sequence of commands')
@@ -349,13 +376,17 @@ while (recieve):
 					else:
 						#print('500 Syntax error: command unrecognized')
 						conn.sendall('500 Syntax error: command unrecognized\n'.encode())
-					resetemail()
+					#resetemail()
+					state = -3
 			#Only accepting RCPT TO:
 			case 1:
+				input = msginput[0]
+				#print(input)
 				if rcpttocmd():
 					#print('250 OK')
-					conn.sendall('250 OK\n'.encode())
+					conn.send('250 OK\n'.encode())
 					state = 2
+					msginput.pop(0)
 					if not hostpresent():
 						hosts.append(input[hoststart:pathend])
 					recipients.append(input[pathstart:pathend])
@@ -369,12 +400,16 @@ while (recieve):
 					else:
 						#print('500 Syntax error: command unrecognized')
 						conn.send('500 Syntax error: command unrecognized\n'.encode())
-					resetemail()
+					#resetemail()
+					state = -3
 			#Accepting both RCPT TO: and DATA
 			case 2:
+				input = msginput[0]
+				#print(input)
 				if rcpttocmd():
 					#print('250 OK')
-					conn.sendall('250 OK\n'.encode())
+					conn.send('250 OK\n'.encode())
+					msginput.pop(0)
 					if not hostpresent():
 						hosts.append(input[hoststart:pathend])
 					recipients.append(input[pathstart:pathend])
@@ -382,6 +417,8 @@ while (recieve):
 					#print('354 Start mail input; end with <CRLF>.<CRLF>')
 					conn.send('354 Start mail input; end with <CRLF>.<CRLF>\n'.encode())
 					state = 3
+					msginput.pop(0)
+					#print(msginput[0])
 				else:
 					if commandcheck(0):
 						#print('503 Bad sequence of commands')
@@ -392,28 +429,37 @@ while (recieve):
 					else:
 						#print('500 Syntax error: command unrecognized')
 						conn.send('500 Syntax error: command unrecognized\n'.encode())
-					resetemail()
+					#resetemail()
+					state = -3
 			#Email body input
 			case 3:
+				input = msginput[0]
+				#print(input)
 				if input[0] == "." and ord(input[1]) == 10:
 					#print('250 OK')
-					conn.send('250 OK\n'.encode())
+					conn.sendall('250 OK\n'.encode())
+					input = conn.recv(2048).decode()
 					for i in range(len(hosts)):
 						#print(recipients[i][1:-1])
-						file = open(f'HW4/forward/{hosts[i][1:-1]}', 'a')
+						pathfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forward', hosts[i][1:-1])
+						file = open(pathfile, 'a')
 						file.write(email)
-						state = -2
-						#print("Successfully written")
+					state = -2
+					#print("Successfully written")
+					#print(input)
 				else:
 					email += input
+					msginput.pop(0)
 			case -2:
 				state = -1
+			case -3:
+				input = conn.recv(2048).decode()
 	except Exception as error:
 		print(error)
+		conn.send('CLOSE CONNECTION'.encode())
+		#print('errororor')
 		resetemail()
 	except KeyboardInterrupt as error:
-		#print('eeee')
-		#print(error)
 		#print(soc)
 		soc.close()
 #except:
@@ -427,3 +473,4 @@ while (recieve):
 #print(soc.getsockname())
 #soc.shutdown(socket.SHUT_RDWR)
 #print(soc)
+soc.close()
