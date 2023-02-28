@@ -184,25 +184,24 @@ def datacmd():
 
 def commandcheck(key):
 	global current
-	match key:
-		case 0:
-			if mailname():
-				current = 0
-				return True
+	if key == 0:
+		if mailname():
 			current = 0
-			return False
-		case 1:
-			if rcptname():
-				current = 0
-				return True
+			return True
+		current = 0
+		return False
+	elif key == 1:
+		if rcptname():
 			current = 0
-			return False
-		case 2:
-			if datacmd():
-				current = 0
-				return True
+			return True
+		current = 0
+		return False
+	elif key == 2:
+		if datacmd():
 			current = 0
-			return False
+			return True
+		current = 0
+		return False
 
 def arbitrarytext():
 	global input
@@ -335,125 +334,127 @@ while (recieve):
 			resetemail()
 			#print('se')
 			state = -2
-		match state:
-			#Accepting HELO message
-			case -1:
+		#Accepting HELO message
+		if state == -1:
+			input = conn.recv(2048).decode()
+			if helomsg():
+				#print(f'250 Hello {partner} pleased to meet you')
+				conn.sendall(f'250 Hello {partner} pleased to meet you\n'.encode())
+				state = 0
+			else:
+				#print(f'ERROR -> {input}')
+				#print(len(input))
+				resetemail()
+		#Only accepting MAIL FROM:
+		if state == 0:
+			msginput = conn.recv(2048).decode()
+			#msginput = 'MAIL FROM:<jack@cs.unc.edu>\nRCPT TO:<.jeffay@cs.unc.edu >\n'
+			#msginput = 'MAIL FROM:<jeffay@cs.un*c.edu>\n'
+			#msginput = ' MAIL FROM:<jeffay@cs.unc.edu>\n'
+			#msginput = 'MAIL FROM:<jack@cs.unc.edu>\nRCPT TO:<jake@cs.unc.edu>\n MAIL FROM:<jeffay@unc.edu>\n'
+			msginput = msginput.split('\n')
+			for i in range(len(msginput)):
+				msginput[i] += '\n'
+			msginput.pop(len(msginput)-1)
+			input = msginput[0]
+			#print(msginput)
+			#print(input)
+			if mailfromcmd():
+				#print('250 OK')
+				conn.send('250 OK\n'.encode())
+				state = 1
+				msginput.pop(0)
+			else:
+				if commandcheck(1) or commandcheck(2):
+					#print('503 Bad sequence of commands')
+					conn.senadall('503 Bad sequence of commands\n'.encode())
+				elif commandcheck(0):
+					#print('501 Syntax error in parameters or arguments')
+					conn.sendall('501 Syntax error in parameters or arguments\n'.encode())
+				else:
+					#print('500 Syntax error: command unrecognized')
+					conn.sendall('500 Syntax error: command unrecognized\n'.encode())
+				#resetemail()
+				state = -3
+		#Only accepting RCPT TO:
+		if state == 1:
+			input = msginput[0]
+			#print(input)
+			if rcpttocmd():
+				#print('250 OK')
+				conn.send('250 OK\n'.encode())
+				state = 2
+				msginput.pop(0)
+				if not hostpresent():
+					hosts.append(input[hoststart:pathend])
+				recipients.append(input[pathstart:pathend])
+			else:
+				if commandcheck(0) or commandcheck(2):
+					#print('503 Bad sequence of commands')
+					conn.send('503 Bad sequence of commands\n'.encode())
+				elif commandcheck(1):
+					#print('501 Syntax error in parameters or arguments')
+					conn.send('501 Syntax error in parameters or arguments\n'.encode())
+				else:
+					#print('500 Syntax error: command unrecognized')
+					conn.send('500 Syntax error: command unrecognized\n'.encode())
+				#resetemail()
+				state = -3
+		#Accepting both RCPT TO: and DATA
+		elif state == 2:
+			input = msginput[0]
+			#print(input)
+			if rcpttocmd():
+				#print('250 OK')
+				conn.send('250 OK\n'.encode())
+				msginput.pop(0)
+				if not hostpresent():
+					hosts.append(input[hoststart:pathend])
+				recipients.append(input[pathstart:pathend])
+			elif datacmd():
+				#print('354 Start mail input; end with <CRLF>.<CRLF>')
+				conn.send('354 Start mail input; end with <CRLF>.<CRLF>\n'.encode())
+				state = 3
+				msginput.pop(0)
+				#print(msginput[0])
+			else:
+				if commandcheck(0):
+					#print('503 Bad sequence of commands')
+					conn.send('503 Bad sequence of commands\n'.encode())
+				elif commandcheck(1):
+					#print('501 Syntax error in parameters or arguments')
+					conn.send('501 Syntax error in parameters or arguments\n'.encode())
+				else:
+					#print('500 Syntax error: command unrecognized')
+					conn.send('500 Syntax error: command unrecognized\n'.encode())
+				#resetemail()
+				state = -3
+		#Email body input
+		elif state == 3:
+			input = msginput[0]
+			#print(input)
+			if len(input) == 2 and input[0] == "." and ord(input[1]) == 10:
+				#print('250 OK')
+				conn.sendall('250 OK\n'.encode())
 				input = conn.recv(2048).decode()
-				if helomsg():
-					#print(f'250 Hello {partner} pleased to meet you')
-					conn.sendall(f'250 Hello {partner} pleased to meet you\n'.encode())
-					state = 0
-				else:
-					#print(f'ERROR -> {input}')
-					#print(len(input))
-					resetemail()
-			#Only accepting MAIL FROM:
-			case 0:
-				msginput = conn.recv(2048).decode()
-				#msginput = 'MAIL FROM:<jack@cs.unc.edu>\nRCPT TO:<.jeffay@cs.unc.edu >\n'
-				#msginput = 'MAIL FROM:<jeffay@cs.un*c.edu>\n'
-				#msginput = ' MAIL FROM:<jeffay@cs.unc.edu>\n'
-				#msginput = 'MAIL FROM:<jack@cs.unc.edu>\nRCPT TO:<jake@cs.unc.edu>\n MAIL FROM:<jeffay@unc.edu>\n'
-				msginput = msginput.split('\n')
-				for i in range(len(msginput)):
-					msginput[i] += '\n'
-				msginput.pop(len(msginput)-1)
-				input = msginput[0]
-				#print(msginput)
+				for i in range(len(hosts)):
+					#print(recipients[i][1:-1])
+					pathfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forward', hosts[i][1:-1])
+					file = open(pathfile, 'a')
+					print(f'PATH: {pathfile}')
+					print(email)
+					file.write(email)
+					file.close()
+				state = -2
+				#print("Successfully written")
 				#print(input)
-				if mailfromcmd():
-					#print('250 OK')
-					conn.send('250 OK\n'.encode())
-					state = 1
-					msginput.pop(0)
-				else:
-					if commandcheck(1) or commandcheck(2):
-						#print('503 Bad sequence of commands')
-						conn.senadall('503 Bad sequence of commands\n'.encode())
-					elif commandcheck(0):
-						#print('501 Syntax error in parameters or arguments')
-						conn.sendall('501 Syntax error in parameters or arguments\n'.encode())
-					else:
-						#print('500 Syntax error: command unrecognized')
-						conn.sendall('500 Syntax error: command unrecognized\n'.encode())
-					#resetemail()
-					state = -3
-			#Only accepting RCPT TO:
-			case 1:
-				input = msginput[0]
-				#print(input)
-				if rcpttocmd():
-					#print('250 OK')
-					conn.send('250 OK\n'.encode())
-					state = 2
-					msginput.pop(0)
-					if not hostpresent():
-						hosts.append(input[hoststart:pathend])
-					recipients.append(input[pathstart:pathend])
-				else:
-					if commandcheck(0) or commandcheck(2):
-						#print('503 Bad sequence of commands')
-						conn.send('503 Bad sequence of commands\n'.encode())
-					elif commandcheck(1):
-						#print('501 Syntax error in parameters or arguments')
-						conn.send('501 Syntax error in parameters or arguments\n'.encode())
-					else:
-						#print('500 Syntax error: command unrecognized')
-						conn.send('500 Syntax error: command unrecognized\n'.encode())
-					#resetemail()
-					state = -3
-			#Accepting both RCPT TO: and DATA
-			case 2:
-				input = msginput[0]
-				#print(input)
-				if rcpttocmd():
-					#print('250 OK')
-					conn.send('250 OK\n'.encode())
-					msginput.pop(0)
-					if not hostpresent():
-						hosts.append(input[hoststart:pathend])
-					recipients.append(input[pathstart:pathend])
-				elif datacmd():
-					#print('354 Start mail input; end with <CRLF>.<CRLF>')
-					conn.send('354 Start mail input; end with <CRLF>.<CRLF>\n'.encode())
-					state = 3
-					msginput.pop(0)
-					#print(msginput[0])
-				else:
-					if commandcheck(0):
-						#print('503 Bad sequence of commands')
-						conn.send('503 Bad sequence of commands\n'.encode())
-					elif commandcheck(1):
-						#print('501 Syntax error in parameters or arguments')
-						conn.send('501 Syntax error in parameters or arguments\n'.encode())
-					else:
-						#print('500 Syntax error: command unrecognized')
-						conn.send('500 Syntax error: command unrecognized\n'.encode())
-					#resetemail()
-					state = -3
-			#Email body input
-			case 3:
-				input = msginput[0]
-				#print(input)
-				if input[0] == "." and ord(input[1]) == 10:
-					#print('250 OK')
-					conn.sendall('250 OK\n'.encode())
-					input = conn.recv(2048).decode()
-					for i in range(len(hosts)):
-						#print(recipients[i][1:-1])
-						pathfile = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'forward', hosts[i][1:-1])
-						file = open(pathfile, 'a')
-						file.write(email)
-					state = -2
-					#print("Successfully written")
-					#print(input)
-				else:
-					email += input
-					msginput.pop(0)
-			case -2:
-				state = -1
-			case -3:
-				input = conn.recv(2048).decode()
+			else:
+				email += input
+				msginput.pop(0)
+		elif (state == -2):
+			state = -1
+		elif (state == -3):
+			input = conn.recv(2048).decode()
 	except Exception as error:
 		print(error)
 		conn.send('CLOSE CONNECTION'.encode())
