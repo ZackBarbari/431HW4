@@ -10,6 +10,7 @@ current = 0
 state = -2
 rcptstart = 0
 rcpts = []
+responsearray = []
 
 def special():
 	global input
@@ -47,10 +48,12 @@ def nullspace():
 def breakread():
 	global soc
 	global sending
+	global response
 	#print('QUIT')
 	soc.sendall('QUIT\n'.encode())
 	#file.close()
-	response = soc.recv(10204).decode()
+	response = soc.recv(2048).decode()
+	#print(f'EXP: 221, REC: {response}')
 	print('Error in connection with server, please try again')
 	sending = False
 
@@ -92,27 +95,21 @@ def getresponse(code):
 	global response
 	global file
 	global soc
+	global responsearray
 	#print(soc.getsockname())
-	response = soc.recv(10204).decode()
-	#print(f'RES {response}')
+	if len(responsearray) == 0:
+		temp = soc.recv(2048).decode()
+		responsearray = temp.split('\n')
+		for i in range(len(responsearray)):
+			responsearray[i] += '\n'
+		responsearray.pop(len(responsearray)-1)
+	#response = soc.recv(2048).decode()
+	#print(f'ARRAY: {responsearray}')
+	response = responsearray[0]
+	responsearray.pop(0)
+	#print(f'EXP {code}, RES {response}')
 	if not responsecode(code):
 		breakread()
-
-def bodyread():
-	global fileline
-	global file
-	global state
-	global soc
-	if len(fileline) >= 5 and fileline[0] == 'F' and fileline[1] == 'r' and fileline[2] == 'o' and fileline[3] == 'm' and fileline[4] == ':':
-		print('.')
-		soc.send('.'.encode())
-		getresponse('250')
-		if file:
-			#print(f'MAIL FROM: {fileline[:-1]}')
-			getresponse('250')
-			state = 1
-	else:
-		print(fileline[:-1])
 
 def char():
 	global input
@@ -224,7 +221,8 @@ def validto():
 
 #file = open(sys.argv[1], 'r')
 #data = soc.recv(1024)
-msg = ""
+msg = ''
+output = ''
 inputstate = 0
 input = True
 sending = False
@@ -237,6 +235,7 @@ try:
 				if validfrom():
 					inputstate = 1
 					fromline = input
+					#fromline = 'bana@ag.a.\n'
 					msg += (f'From: <{fromline[:-1]}>\n')
 				else:
 					print('Bad from grammar.')
@@ -246,7 +245,8 @@ try:
 				if validto():
 					#print(rcpts, len(rcpts))
 					inputstate = 2
-					toline = input
+					#toline = input
+					#toline = 'bana@ag.a.\n'
 					msg += 'To: '
 					for i in range(len(rcpts)):
 						msg += (f'<{rcpts[i]}>')
@@ -298,6 +298,7 @@ if(soc):
 	#print("Just a print, handshake recicved, yippee!")
 try:
 	while(sending):
+		#print(state)
 		match state:
 			#Sending HELO
 			case -1:
@@ -308,27 +309,34 @@ try:
 			#Reading From:
 			case 0:
 				#print(f'MAIL FROM: <{fromline[:-1]}>')
-				soc.sendall(f'MAIL FROM: <{fromline[:-1]}>\n'.encode())
+				output = f'MAIL FROM: <{fromline[:-1]}>\n'
+				for i in range(len(rcpts)):
+					output += f'RCPT TO: <{rcpts[i]}>\n'
+				output += f'DATA\n{msg}.\n'
+				soc.sendall(output.encode())
+				#soc.sendall(f'MAIL FROM: <{fromline[:-1]}>\n'.encode())
 				getresponse('250')
 				state = 1
 			#Reading To:
 			case 1:
 				for i in range(len(rcpts)):
+					#print('iii')
 					#print(f'RCPT TO: <{rcpts[i]}>')
-					soc.sendall(f'RCPT TO: <{rcpts[i]}>\n'.encode())
+					#soc.sendall(f'RCPT TO: <{rcpts[i]}>\n'.encode())
 					getresponse('250')
 				state = 2
 			#Reading Subject:
 			case 2:
 				#print('DATA')
-				soc.sendall('DATA\n'.encode())
+				#soc.sendall('DATA\n'.encode())
+				#print(soc.recv(2048).decode())
 				getresponse('354')
 				state = 3
 			case 3:
 				#print(msg)
-				soc.sendall((f'{msg}').encode())
+				#soc.sendall((f'{msg}').encode())
 				#print('.')
-				soc.sendall('.\n'.encode())
+				#soc.sendall('.\n'.encode())
 				getresponse('250')
 				#print('QUIT')
 				soc.sendall('QUIT\n'.encode())
